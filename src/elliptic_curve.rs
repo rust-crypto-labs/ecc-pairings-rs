@@ -16,6 +16,7 @@ pub struct ECPoint<F: Field> {
 // Elliptic curve data structure
 impl<F: Field> EllipticCurve<F> {
     // New curve, long Weierstrass form
+    // y² + a1 xy + a3 y = x³ + a2 x² + a4 x + a6
     pub fn new_long_weierstrass(coeffs: [F; 6]) -> Self {
         unimplemented!()
     }
@@ -26,13 +27,13 @@ impl<F: Field> EllipticCurve<F> {
     }
 
     // Get long Weierstrass coeffs
-    pub fn get_long_weierstrass(&self) -> [F; 6] {
+    pub fn get_a_invariants(&self) -> [F; 6] {
         unimplemented!()
     }
 }
 
 // Point operations
-impl<F: Field> ECPoint<F> {
+impl<F: Field + Clone + Eq> ECPoint<F> {
     // New point from affine coords
     pub fn new_affine(curve: &EllipticCurve<F>, x: F, y: F) -> Self {
         unimplemented!()
@@ -49,8 +50,84 @@ impl<F: Field> ECPoint<F> {
     }
 
     // Returns the evaluation of the line PQ at R, where P is self
+    // /!\ R cannot be the zero point
     pub fn line(&self, pt_q: &Self, pt_r: &Self) -> F {
-        unimplemented!()
+        let x_p = self.x.clone();
+        let y_p = self.y.clone();
+
+        let x_q = pt_q.x.clone();
+        let y_q = pt_q.y.clone();
+
+        let x_r = pt_r.x.clone();
+        let y_r = pt_r.y.clone();
+
+        if self.is_zero() || pt_q.is_zero() {
+            if self.is_equal(&pt_q) {
+                // Case P = Q = 0
+                // 1
+                return F::one();
+            } else if self.is_zero() {
+                // Case P = 0
+                // xR - xQ
+                return x_r.clone().add(&x_q.clone().neg());
+            } else {
+                // Case Q = 0
+                // xR - xP
+                return x_r.clone().add(&x_p.clone().neg());
+            }
+        } else if !self.is_equal(&pt_q) {
+            // Case P != Q
+            if x_p == x_q {
+                // Case xP = xQ
+                // xR - xP
+                return x_r.clone().add(&x_p.neg());
+            } else {
+                // Case xP != xQ
+                let num = y_q.clone().add(&x_p.clone().neg());
+                let denom = x_q.clone().add(&x_p.clone().neg());
+                let slope = num.div(&denom);
+
+                let xdiff = (x_r.clone().add(&x_p.clone().neg())).mul(&slope).neg();
+                let ydiff = y_r.clone().add(&y_p.clone().neg());
+                let res = xdiff.add(&ydiff);
+
+                return res;
+            }
+        } else {
+            // Case P = Q
+
+            let a = self.curve.get_a_invariants();
+            let a1 = &a[0];
+            let a2 = &a[1];
+            let a3 = &a[2];
+            let a4 = &a[3];
+
+            // 3x² + 2x a2 - y a1 + a4
+            let num = x_p
+                .clone()
+                .square()
+                .zmul(3)
+                .add(&y_p.clone().mul(&a1).neg())
+                .add(&a4)
+                .add(&x_p.clone().mul(&a2).zmul(2));
+
+            // 2y + x a1 + a3
+            let denom = y_p.clone().zmul(2).add(&a3).add(&x_p.clone().mul(&a1));
+
+            if denom == F::zero() {
+                // xR - xP
+                return x_r.clone().add(&x_p.neg());
+            } else {
+                let slope = num.div(&denom);
+
+                let xdiff = (x_r.clone().add(&x_p.clone().neg())).mul(&slope).neg();
+                let ydiff = y_r.clone().add(&y_p.clone().neg());
+
+                let res = ydiff.add(&xdiff);
+
+                return res;
+            }
+        }
     }
 
     // Returns the addition of self with Q

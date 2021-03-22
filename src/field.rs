@@ -13,6 +13,9 @@ pub trait Field {
     // Multiplication
     fn mul(self, y: &Self) -> Self;
 
+    // Multiplication by an integer
+    fn zmul(self, y: i64) -> Self;
+
     // Power
     fn pow(self, y: &BigInt) -> Self;
 

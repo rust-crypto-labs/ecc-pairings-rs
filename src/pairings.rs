@@ -2,7 +2,7 @@ use crate::{bigint::BigInt, elliptic_curve::ECPoint, field::Field};
 
 // Miller's algorithm
 // Returns f_{n,P}(Q) where div(f_{n,P}) = n(P) - ([n]P) - (n-1)(0)
-pub fn miller<F: Field + Clone>(
+pub fn miller<F: Field + Clone + Eq>(
     pt_p: &ECPoint<F>,
     pt_q: &ECPoint<F>,
     n: &BigInt,
@@ -68,7 +68,7 @@ pub fn miller<F: Field + Clone>(
 // Weil pairing
 // /!\ I'm not checking that P, Q are on the same curve, I'm not checking that they are of the given order
 // If you input incorrect data you get incorrect results
-pub fn weil_pairing<F: Field + Clone>(
+pub fn weil_pairing<F: Field + Clone + Eq>(
     pt_p: ECPoint<F>,
     pt_q: ECPoint<F>,
     order: BigInt,
@@ -99,7 +99,7 @@ pub fn weil_pairing<F: Field + Clone>(
 //
 // Returns f_{n,P}(Q)^e  where div(f_{n,P}) = n(P) - n(O) and
 // e = (q^k - 1)/n with q = base field size, n = order, and k = embedding degree
-pub fn tate_pairing<F: Field + Clone>(
+pub fn tate_pairing<F: Field + Clone + Eq>(
     pt_p: &ECPoint<F>,
     pt_q: &ECPoint<F>,
     order: &BigInt,
@@ -132,7 +132,7 @@ pub fn tate_pairing<F: Field + Clone>(
 // Q is on E/Fq^k where k = embedding degree
 // P in ker(Frob - 1)
 // Q in ker(Frob - q)
-pub fn ate_pairing<F: Field + Clone>(
+pub fn ate_pairing<F: Field + Clone + Eq>(
     pt_p: &ECPoint<F>,
     pt_q: &ECPoint<F>,
     order: &BigInt,
