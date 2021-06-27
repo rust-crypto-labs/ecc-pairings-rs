@@ -46,7 +46,15 @@ impl<F: Field + Clone + Eq> ECPoint<F> {
 
     // Returns true if the two points are equal
     pub fn is_equal(&self, other: &Self) -> bool {
-        unimplemented!()
+        let mut c = 0;
+        for i in self.curve.weierstrass_coefficients {
+            if i != other.curve.weierstrass_coefficients[c] {
+                return false;
+            }
+            c+=1;
+        }
+
+        return self.x.eq(&other.x) && self.y.eq(&other.y);
     }
 
     // Returns the evaluation of the line PQ at R, where P is self
