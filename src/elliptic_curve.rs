@@ -104,10 +104,7 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
             // Case P = Q
 
             let a = self.curve.get_a_invariants();
-            let a1 = &a[0];
-            let a2 = &a[1];
-            let a3 = &a[2];
-            let a4 = &a[3];
+            let (a1, a2, a3, a4) = (&a[0], &a[1], &a[2], &a[3]);
 
             // 3x² + 2x a2 - y a1 + a4
             let num = x_p
@@ -144,8 +141,8 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
         let x2 = &pt_q.x;
         let y2 = &pt_q.y;
         let a = &self.curve.get_a_invariants();
-        if x1 == x2 && y1 + y2 + &a[0] * x2 + &a[2] == 0 {
-            return *self.curve.infinity_point();
+        let (a1, a2, a3, a4, a6) = (&a[0], &a[1], &a[2], &a[3], &a[5]);
+
         } else {
             let mut lambda;
             let mut nu;
