@@ -1,28 +1,27 @@
 use crate::field::Field;
-use std::ops::Add;
 
 // Generic elliptic curve
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct EllipticCurve<F: Field> {
     weierstrass_coefficients: [F; 6],
 }
 
 // Rational point on an elliptic curve (affine coords)
-#[derive(Clone, Debug)]
-pub struct ECPoint<F: Field> {
+#[derive(Clone, Debug, PartialEq)]
+pub struct ECPoint<F: Field + Clone> {
     pub curve: EllipticCurve<F>,
     pub x: F,
     pub y: F,
 }
 
 // Elliptic curve data structure
-impl<F: Field + Clone + Eq> EllipticCurve<F> {
+impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
     // New curve, long Weierstrass form
     // y² + a1 xy + a3 y = x³ + a2 x² + a4 x + a6
     pub fn new_long_weierstrass(coeffs: [F; 6]) -> Self {
         return EllipticCurve {
             weierstrass_coefficients: coeffs,
-        }
+        };
     }
 
     // Random point
@@ -30,20 +29,18 @@ impl<F: Field + Clone + Eq> EllipticCurve<F> {
         unimplemented!()
     }
 
-    pub fn infinity_point(self) -> ECPoint<F> {unimplemented!()}
+    pub fn infinity_point(self) -> ECPoint<F> {
+        unimplemented!()
+    }
 
     // Get long Weierstrass coeffs
     pub fn get_a_invariants(&self) -> [F; 6] {
         return self.weierstrass_coefficients.clone();
     }
-
-    pub fn is_equal(&self, other: &Self) -> bool {
-        return &self.weierstrass_coefficients == &other.weierstrass_coefficients;
-    }
 }
 
 // Point operations
-impl<F: Field + Clone + Eq + Add> ECPoint<F> {
+impl<F: Field + Clone + PartialEq> ECPoint<F> {
     // New point from affine coords
     pub fn new_affine(curve: &EllipticCurve<F>, x: F, y: F) -> Self {
         unimplemented!()
@@ -56,7 +53,7 @@ impl<F: Field + Clone + Eq + Add> ECPoint<F> {
 
     // Returns true if the two points are equal
     pub fn is_equal(&self, other: &Self) -> bool {
-        return self.curve.is_equal(&other.curve) && &self.x == &other.x && &self.y == &other.y;
+        return self.curve == other.curve && self.x == other.x && self.y == other.y;
     }
 
     // Returns the evaluation of the line PQ at R, where P is self
