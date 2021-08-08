@@ -18,7 +18,9 @@ impl<F: Field> EllipticCurve<F> {
     // New curve, long Weierstrass form
     // y² + a1 xy + a3 y = x³ + a2 x² + a4 x + a6
     pub fn new_long_weierstrass(coeffs: [F; 6]) -> Self {
-        unimplemented!()
+        return EllipticCurve {
+            weierstrass_coefficients: coeffs,
+        }
     }
 
     // Random point
@@ -26,13 +28,15 @@ impl<F: Field> EllipticCurve<F> {
         unimplemented!()
     }
 
+    pub fn infinity_point(self) -> ECPoint<F> {unimplemented!()}
+
     // Get long Weierstrass coeffs
     pub fn get_a_invariants(&self) -> [F; 6] {
-        unimplemented!()
+        return *self.weierstrass_coefficients;
     }
 
     pub fn is_equal(&self, other: &Self) -> bool {
-        return self.weierstrass_coefficients.e == &other.weierstrass_coefficients;
+        return self.weierstrass_coefficients == &other.weierstrass_coefficients;
     }
 }
 
@@ -136,7 +140,30 @@ impl<F: Field + Clone + Eq> ECPoint<F> {
 
     // Returns the addition of self with Q
     pub fn add(&self, pt_q: &Self) -> Self {
-        unimplemented!()
+        let x1 = &self.x;
+        let y1 = &self.y;
+        let x2 = &pt_q.x;
+        let y2 = &pt_q.y;
+        let a = &self.curve.get_a_invariants();
+        if x1 == x2 && y1 + y2 + &a[0] * x2 + &a[2] == 0 {
+            return *self.curve.infinity_point();
+        } else {
+            let mut lambda;
+            let mut nu;
+            if x1 == x2 {
+                lambda = (3 * x1^2 + 2 * &a[1] * x1 + &a[3] - &a[0] * y1)/(2 * y1 + &a[0] * x1 + &a[2]);
+                nu = (- x1^3 + &a[3] * x1 + 2 * &a[5] - &a[2] * y1)/(2 * y1 + &a[0] * x1 + &a[2]);
+            } else {
+                lambda = (y2 - y1)/(x2 - x1);
+                nu = (y1 * x2 - y2 * x1)/(x2 - x1);
+            }
+            let x3 = lambda^2 + &a[0] * lambda - &a[1] - x1 - x2;
+            return ECPoint {
+                curve: *self.curve,
+                x: x3,
+                y: -(lambda + &a[0]) * x3 - nu - &a[2]
+            }
+        }
     }
 
     // Doubles self
@@ -146,6 +173,11 @@ impl<F: Field + Clone + Eq> ECPoint<F> {
 
     // Returns the inverse of self
     pub fn invert(&self) -> Self {
-        unimplemented!()
+        let a_invariants = &self.curve.get_a_invariants();
+        return ECPoint{
+            curve: *self.curve,
+            x: &self.x,
+            y: -&self.y - &a_invariants[0] * &self.x - &a_invariants[2]
+        }
     }
 }
