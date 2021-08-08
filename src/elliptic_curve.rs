@@ -143,22 +143,59 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
         let a = &self.curve.get_a_invariants();
         let (a1, a2, a3, a4, a6) = (&a[0], &a[1], &a[2], &a[3], &a[5]);
 
+        if x1 == x2 && y1.clone().add(&y2).add(&a1.clone().mul(&x2)).add(&a3) == F::zero() {
+            return self.curve.clone().infinity_point();
         } else {
-            let mut lambda;
-            let mut nu;
+            let lambda;
+            let nu;
             if x1 == x2 {
-                lambda = (3 * x1^2 + 2 * &a[1] * x1 + &a[3] - &a[0] * y1)/(2 * y1 + &a[0] * x1 + &a[2]);
-                nu = (- x1^3 + &a[3] * x1 + 2 * &a[5] - &a[2] * y1)/(2 * y1 + &a[0] * x1 + &a[2]);
+                lambda = (a4
+                    .clone()
+                    .add(&x1.clone().square().zmul(3))
+                    .add(&a2.clone().mul(&x1).zmul(2))
+                    .add(&a1.clone().mul(&y1).neg()))
+                .div(
+                    &a3.clone()
+                        .add(&y1.clone().zmul(2))
+                        .add(&a1.clone().mul(&x1)),
+                );
+                nu = (x1.clone().square().mul(&x1).neg())
+                    .add(&a4.clone().mul(&x1))
+                    .add(&a6.clone().zmul(2))
+                    .add(&a3.clone().mul(&y1).neg())
+                    .div(
+                        &a3.clone()
+                            .add(&y1.clone().zmul(2))
+                            .add(&a1.clone().mul(&x1)),
+                    );
             } else {
-                lambda = (y2 - y1)/(x2 - x1);
-                nu = (y1 * x2 - y2 * x1)/(x2 - x1);
+                lambda = y2
+                    .clone()
+                    .add(&y1.clone().neg())
+                    .div(&x2.clone().add(&x1.clone().neg()));
+                nu = y1
+                    .clone()
+                    .mul(&x2)
+                    .add(&y2.clone().mul(&x1).neg())
+                    .div(&x2.clone().add(&x1.clone().neg()));
             }
-            let x3 = lambda^2 + &a[0] * lambda - &a[1] - x1 - x2;
+            let x = a2
+                .clone()
+                .neg()
+                .add(&x1.clone().add(&x2).neg())
+                .add(&lambda.clone().square())
+                .add(&a1.clone().mul(&lambda));
+            let y = a3
+                .clone()
+                .add(&nu)
+                .add(&x.clone().mul(&lambda.add(&a1)))
+                .neg();
+
             return ECPoint {
-                curve: *self.curve,
-                x: x3,
-                y: -(lambda + &a[0]) * x3 - nu - &a[2]
-            }
+                curve: self.curve.clone(),
+                x,
+                y,
+            };
         }
     }
 
@@ -169,11 +206,12 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
 
     // Returns the inverse of self
     pub fn invert(&self) -> Self {
-        let a_invariants = &self.curve.get_a_invariants();
-        return ECPoint{
-            curve: *self.curve,
-            x: &self.x,
-            y: -&self.y - &a_invariants[0] * &self.x - &a_invariants[2]
-        }
+        let a = self.curve.get_a_invariants();
+        let (a1, a3) = (&a[0], &a[2]);
+        return ECPoint {
+            curve: self.curve.clone(),
+            x: self.x.clone(),
+            y: a3.clone().add(&a1.clone().mul(&self.x)).add(&self.y).neg(),
+        };
     }
 }
