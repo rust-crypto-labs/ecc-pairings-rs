@@ -12,6 +12,7 @@ pub struct ECPoint<F: Field + Clone> {
     pub curve: EllipticCurve<F>,
     pub x: F,
     pub y: F,
+    pub is_infinity_point: bool,
 }
 
 // Elliptic curve data structure
@@ -53,11 +54,17 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
             curve: self.clone(),
             x: rand_x.clone(),
             y: rand_y.clone(),
+            is_infinity_point: false,
         };
     }
 
     pub fn infinity_point(self) -> ECPoint<F> {
-        unimplemented!()
+        return ECPoint {
+            curve: self.clone(),
+            x: F::zero(),
+            y: F::zero(),
+            is_infinity_point: true,
+        };
     }
 
     // Get long Weierstrass coeffs
@@ -74,12 +81,13 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
             curve: curve.clone(),
             x: x.clone(),
             y: y.clone(),
+            is_infinity_point: false,
         };
     }
 
     // Returns true if and only if this is the point at infinity
     pub fn is_zero(&self) -> bool {
-        return self.clone().is_equal(&self.curve.clone().infinity_point());
+        return self.is_infinity_point;
     }
 
     // Returns true if the two points are equal
@@ -229,12 +237,16 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
                 curve: self.curve.clone(),
                 x,
                 y,
+                is_infinity_point: false,
             };
         }
     }
 
     // Doubles self
     pub fn double(&self) -> Self {
+        if self.clone().is_zero() {
+            return self.clone();
+        }
         let x_p = &self.x;
         let y_p = &self.y;
         let a = &self.curve.get_a_invariants();
@@ -270,6 +282,7 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
                 .add(&res_x.clone().mul(&lambda.clone()))
                 .add(&x_p.clone().mul(&lambda.clone()))
                 .add(&y_p.clone().neg()),
+            is_infinity_point: false,
         };
     }
 
@@ -281,6 +294,7 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
             curve: self.curve.clone(),
             x: self.x.clone(),
             y: a3.clone().add(&a1.clone().mul(&self.x)).add(&self.y).neg(),
+            is_infinity_point: false,
         };
     }
 }
