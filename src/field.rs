@@ -19,11 +19,17 @@ pub trait Field {
     // Power
     fn pow(self, y: &BigInt) -> Self;
 
+    // Int power
+    fn zpow(self, y: i64) -> Self;
+
     // Division
     fn div(self, y: &Self) -> Self;
 
     // Squaring
     fn square(self) -> Self;
+
+    // Square root
+    fn sqrt(self) -> Self;
 
     // Multiplicative inverse
     fn invert(self) -> Self;
@@ -39,4 +45,7 @@ pub trait Field {
 
     // Base field order
     fn base_order() -> BigInt;
+
+    // Random field point
+    fn random_element() -> Self;
 }

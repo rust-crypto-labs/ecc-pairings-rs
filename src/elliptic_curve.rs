@@ -26,7 +26,34 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
 
     // Random point
     pub fn random_point(self) -> ECPoint<F> {
-        unimplemented!()
+        let a = self.get_a_invariants();
+        let (a1, a2, a3, a4, a6) = (&a[0], &a[1], &a[2], &a[3], &a[5]);
+        // Get a random x
+        let rand_x = F::random_element();
+
+        // y² + ( a1 x + a3 ) * y = x³ + a2 x² + a4 x + a6
+        // b = a1 x + a3
+        let b = &rand_x.clone().mul(&a1.clone()).add(&a3.clone());
+
+        // c = - ( x³ + a2 x² + a4 x + a6 )
+        let c = &rand_x
+            .clone()
+            .zpow(3)
+            .add(&rand_x.clone().square().mul(&a2.clone()))
+            .add(&rand_x.clone().mul(&a4.clone()))
+            .add(&a6.clone())
+            .neg();
+        let half = F::one().zmul(2).invert();
+        let delta = &b.clone().square().add(&c.clone().zmul(4).neg());
+
+        // y = ( - b + sqrt( delta ) ) / 2
+        let rand_y = half.mul(&b.clone().neg().add(&delta.clone().sqrt()));
+
+        return ECPoint {
+            curve: self.clone(),
+            x: rand_x.clone(),
+            y: rand_y.clone(),
+        };
     }
 
     pub fn infinity_point(self) -> ECPoint<F> {
@@ -43,12 +70,16 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
 impl<F: Field + Clone + PartialEq> ECPoint<F> {
     // New point from affine coords
     pub fn new_affine(curve: &EllipticCurve<F>, x: F, y: F) -> Self {
-        unimplemented!()
+        return ECPoint {
+            curve: curve.clone(),
+            x: x.clone(),
+            y: y.clone(),
+        };
     }
 
     // Returns true if and only if this is the point at infinity
     pub fn is_zero(&self) -> bool {
-        unimplemented!()
+        return self.clone().is_equal(&self.curve.clone().infinity_point());
     }
 
     // Returns true if the two points are equal
@@ -136,6 +167,9 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
 
     // Returns the addition of self with Q
     pub fn add(&self, pt_q: &Self) -> Self {
+        if self.clone().is_equal(&pt_q.clone()) {
+            return self.double();
+        }
         let x1 = &self.x;
         let y1 = &self.y;
         let x2 = &pt_q.x;
@@ -201,7 +235,42 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
 
     // Doubles self
     pub fn double(&self) -> Self {
-        unimplemented!()
+        let x_p = &self.x;
+        let y_p = &self.y;
+        let a = &self.curve.get_a_invariants();
+        let (a1, a2, a3, a4) = (&a[0], &a[1], &a[2], &a[3]);
+
+        let lambda = &a1
+            .clone()
+            .zmul(3)
+            .add(&x_p.clone().mul(&a2.clone()).zmul(2))
+            .add(&y_p.clone().mul(&a1.clone()).neg())
+            .add(&a4.clone())
+            .mul(
+                &y_p.clone()
+                    .zmul(2)
+                    .add(&x_p.clone().mul(&a1.clone()))
+                    .add(&a3.clone())
+                    .invert(),
+            );
+        let res_x = &lambda
+            .clone()
+            .square()
+            .add(&a1.clone().mul(&lambda.clone()))
+            .add(&a2.clone().neg())
+            .add(&x_p.clone().zmul(2).neg());
+        return ECPoint {
+            curve: self.curve.clone(),
+            x: res_x.clone(),
+            y: res_x
+                .clone()
+                .mul(&a1.clone())
+                .neg()
+                .add(&a3.clone().neg())
+                .add(&res_x.clone().mul(&lambda.clone()))
+                .add(&x_p.clone().mul(&lambda.clone()))
+                .add(&y_p.clone().neg()),
+        };
     }
 
     // Returns the inverse of self
