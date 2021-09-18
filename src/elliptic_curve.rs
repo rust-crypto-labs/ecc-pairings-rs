@@ -285,7 +285,7 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
     }
 
     // Returns the inverse of self
-    // Inifinty point return itself when inverted
+    // /!\ Can not invert zero point
     pub fn invert(&self) -> Result<Self, &'static str> {
         let ((x, y), c) = match self {
             ECPoint::INFPOINT(_c) => return Err("P must not be zero"),
