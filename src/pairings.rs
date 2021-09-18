@@ -36,15 +36,15 @@ pub fn miller<F: Field + Clone + Eq>(
         // Miller loop
         loop {
             let pt_s = pt_v.double();
-            let ell = pt_v.line(&pt_v, &pt_q);
-            let vee = pt_s.line(&pt_s.invert(), &pt_q);
+            let ell = pt_v.line(&pt_v, pt_q);
+            let vee = pt_s.line(&pt_s.invert(), pt_q);
             t = t.square().mul(&ell.div(&vee));
             pt_v = pt_s;
 
             if nbits[i] {
-                let pt_s = pt_v.add(&pt_p);
-                let ell = pt_v.line(&pt_p, &pt_q);
-                let vee = pt_s.line(&pt_s.invert(), &pt_q);
+                let pt_s = pt_v.add(pt_p);
+                let ell = pt_v.line(pt_p, pt_q);
+                let vee = pt_s.line(&pt_s.invert(), pt_q);
                 t = t.mul(&ell.div(&vee));
                 pt_v = pt_s;
             }
@@ -58,7 +58,7 @@ pub fn miller<F: Field + Clone + Eq>(
 
     // Inversion for the Ate pairing
     if !sign {
-        let vee = pt_v.line(&pt_v.invert(), &pt_q);
+        let vee = pt_v.line(&pt_v.invert(), pt_q);
         t = t.mul(&vee).invert();
     }
 
@@ -87,9 +87,9 @@ pub fn weil_pairing<F: Field + Clone + Eq>(
 
     // Sign correction if needed
     if order.is_odd() {
-        return Ok(ratio.neg());
+        Ok(ratio.neg())
     } else {
-        return Ok(ratio);
+        Ok(ratio)
     }
 }
 
@@ -108,15 +108,19 @@ pub fn tate_pairing<F: Field + Clone + Eq>(
     let q = F::base_order();
 
     // Check whether we need to move poles
-    if let Ok(res) = miller(&pt_p, &pt_q, &order) {
+    if let Ok(res) = miller(pt_p, pt_q, order) {
         // We don't
         let e = q.pow(embedding_degree).sub(&BigInt::one()).div(order);
         Ok(res.pow(&e))
     } else {
         // We do
-        let pt_r = pt_p.clone().curve.random_point();
-        let f_qr = tate_pairing(&pt_p, &pt_q.add(&pt_r), order, embedding_degree)?;
-        let f_r = tate_pairing(&pt_p, &pt_r, order, embedding_degree)?;
+        let curve = match pt_p {
+            ECPoint::INFPOINT(c) => c,
+            ECPoint::RATIONALPOINT(pt_r) => &pt_r.curve,
+        };
+        let pt_r = curve.clone().random_point();
+        let f_qr = tate_pairing(pt_p, &pt_q.add(&pt_r), order, embedding_degree)?;
+        let f_r = tate_pairing(pt_p, &pt_r, order, embedding_degree)?;
 
         Ok(f_qr.div(&f_r))
     }
@@ -140,7 +144,7 @@ pub fn ate_pairing<F: Field + Clone + Eq>(
     trace_m_1: &BigInt,
 ) -> Result<F, &'static str> {
     let q = F::base_order();
-    let res = miller(&pt_q, &pt_p, &trace_m_1)?;
-    let e = q.pow(&embedding_degree).sub(&BigInt::one()).div(&order);
+    let res = miller(pt_q, pt_p, trace_m_1)?;
+    let e = q.pow(embedding_degree).sub(&BigInt::one()).div(order);
     Ok(res.pow(&e))
 }
