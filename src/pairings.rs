@@ -36,15 +36,15 @@ pub fn miller<F: Field + Clone + Eq>(
         // Miller loop
         loop {
             let pt_s = pt_v.double();
-            let ell = pt_v.line(&pt_v, pt_q);
-            let vee = pt_s.line(&pt_s.invert(), pt_q);
+            let ell = pt_v.line(&pt_v, pt_q)?;
+            let vee = pt_s.line(&pt_s.invert()?, pt_q)?;
             t = t.square().mul(&ell.div(&vee));
             pt_v = pt_s;
 
             if nbits[i] {
                 let pt_s = pt_v.add(pt_p);
-                let ell = pt_v.line(pt_p, pt_q);
-                let vee = pt_s.line(&pt_s.invert(), pt_q);
+                let ell = pt_v.line(pt_p, pt_q)?;
+                let vee = pt_s.line(&pt_s.invert()?, pt_q)?;
                 t = t.mul(&ell.div(&vee));
                 pt_v = pt_s;
             }
@@ -58,7 +58,7 @@ pub fn miller<F: Field + Clone + Eq>(
 
     // Inversion for the Ate pairing
     if !sign {
-        let vee = pt_v.line(&pt_v.invert(), pt_q);
+        let vee = pt_v.line(&pt_v.invert()?, pt_q)?;
         t = t.mul(&vee).invert();
     }
 

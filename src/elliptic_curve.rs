@@ -95,27 +95,27 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
 
     // Returns the evaluation of the line PQ at R, where P is self
     // /!\ R cannot be the zero point
-    pub fn line(&self, pt_q: &Self, pt_r: &Self) -> F {
+    pub fn line(&self, pt_q: &Self, pt_r: &Self) -> Result<F, &'static str> {
         let (x_r, y_r) = match pt_r {
             // Case P = Q = 0
-            ECPoint::INFPOINT(_c) => panic!("R cannot be the point at infinity"),
+            ECPoint::INFPOINT(_c) => return Err("R cannot be the point at infinity"),
             ECPoint::RATIONALPOINT(pt_r) => &pt_r.coord,
         };
 
         match (self, pt_q) {
             // Case P = Q = 0
-            (ECPoint::INFPOINT(_c1), ECPoint::INFPOINT(_c2)) => F::one(),
+            (ECPoint::INFPOINT(_c1), ECPoint::INFPOINT(_c2)) => Ok(F::one()),
             (ECPoint::INFPOINT(_c), ECPoint::RATIONALPOINT(pt_q)) => {
                 // Case P = 0
                 // xR - xQ
                 let (x_q, _) = pt_q.clone().coord;
-                x_r.clone().add(&x_q.neg())
+                Ok(x_r.clone().add(&x_q.neg()))
             }
             (ECPoint::RATIONALPOINT(pt_p), ECPoint::INFPOINT(_c)) => {
                 // Case Q = 0
                 // xR - xP
                 let (x_p, _) = pt_p.clone().coord;
-                x_r.clone().add(&x_p.neg())
+                Ok(x_r.clone().add(&x_p.neg()))
             }
             (ECPoint::RATIONALPOINT(pt_p), ECPoint::RATIONALPOINT(pt_q)) => {
                 let (x_p, y_p) = pt_p.clone().coord;
@@ -126,7 +126,7 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
                     if x_p == x_q {
                         // Case xP = xQ
                         // xR - xP
-                        x_r.clone().add(&x_p.neg())
+                        Ok(x_r.clone().add(&x_p.neg()))
                     } else {
                         // Case xP != xQ
                         let num = y_q.add(&x_p.clone().neg());
@@ -135,7 +135,7 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
 
                         let xdiff = (x_r.clone().add(&x_p.neg())).mul(&slope).neg();
                         let ydiff = y_r.clone().add(&y_p.neg());
-                        xdiff.add(&ydiff)
+                        Ok(xdiff.add(&ydiff))
                     }
                 } else {
                     // Case P = Q
@@ -156,14 +156,14 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
 
                     if denom == F::zero() {
                         // xR - xP
-                        x_r.clone().add(&x_p.neg())
+                        Ok(x_r.clone().add(&x_p.neg()))
                     } else {
                         let slope = num.div(&denom);
 
                         let xdiff = (x_r.clone().add(&x_p.neg())).mul(&slope).neg();
                         let ydiff = y_r.clone().add(&y_p.neg());
 
-                        ydiff.add(&xdiff)
+                        Ok(ydiff.add(&xdiff))
                     }
                 }
             }
@@ -286,18 +286,18 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
 
     // Returns the inverse of self
     // Inifinty point return itself when inverted
-    pub fn invert(&self) -> Self {
+    pub fn invert(&self) -> Result<Self, &'static str> {
         let ((x, y), c) = match self {
-            ECPoint::INFPOINT(_c) => return self.clone(),
+            ECPoint::INFPOINT(_c) => return Err("P must not be zero"),
             ECPoint::RATIONALPOINT(pt) => (&pt.coord, &pt.curve),
         };
         let a = &c.get_a_invariants();
         let (a1, a3) = (&a[0], &a[2]);
         let new_y = a3.clone().add(&a1.clone().mul(x)).add(y).neg();
 
-        ECPoint::RATIONALPOINT(RationalPoint {
+        Ok(ECPoint::RATIONALPOINT(RationalPoint {
             curve: c.clone(),
             coord: (x.clone(), new_y),
-        })
+        }))
     }
 }
