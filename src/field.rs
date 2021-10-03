@@ -11,7 +11,7 @@ pub trait Field {
     fn add(self, y: &Self) -> Self;
 
     // Multiplication
-    fn mul(self, y: &Self) -> Self;
+    fn mul(&self, y: &Self) -> Self;
 
     // Multiplication by an integer
     fn zmul(self, y: &i64) -> Self;
@@ -86,7 +86,7 @@ impl<const P:u32> Field for PrimeField<P> {
     }
 
     // Multiplication
-    fn mul(self, y: &Self) -> Self {
+    fn mul(&self, y: &Self) -> Self {
         let res = self.value * y.value;
         PrimeField::<P> {value: res.modulo(&P) }
     }
@@ -161,8 +161,41 @@ impl<const P: u32, const N: u32> Field for FiniteField<P,N> {
         return FiniteField::<P,N> {coords: x, polynome: self.polynome};
     }
 
-    fn mul(self, y: &Self) -> Self {
-        todo!()
+    fn mul(&self, y: &Self) -> Self {
+        let zero = PrimeField { value: BigInt::zero() };
+        // Initialize polynomes
+        let A = self.clone().coords;
+        let B = y.coords;
+        let I = self.clone().polynome;
+
+        // Create a polynome of degree 2N - 2
+        const n:usize = N as usize;
+        let Q = [zero; 2 * n - 1];
+
+        // Create reminder polynome
+        let R = [zero; n];
+
+        // Polynomial multiplication A * B
+        for k in 0..(2 * n - 1) {
+            for l in 0..(k+1) {
+                if k - l < n && l < n {
+                    Q[k] = Q[k].add(&A[k-l].mul(&B[l]));
+                }
+            }
+        }
+
+        // Polynomial euclidian remainder
+        for l in n..(2*n-1) {
+            let r = 2*n - 2 - l;
+            for k in 0..n {
+                Q[k+r-n] = &Q[k+r-n].add(&Q[r].mul(&I[k]));
+            }
+        }
+
+        for i  in 0..n {
+            R[i] = Q[i];
+        }
+        FiniteField { coords:R, polynome: self.polynome }
     }
 
     fn zmul(self, y: &i64) -> Self {
