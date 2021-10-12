@@ -1,8 +1,8 @@
-use std::ops::Add;
+use std::ops::{Add, Mul};
 
 use crate::bigint::BigInt;
 // Generic finite field operations
-pub trait Field {
+pub trait Field: Sized {
     // Neutral element for addition
     fn zero(self) -> Self;
 
@@ -31,7 +31,7 @@ pub trait Field {
     fn square(self) -> Self;
 
     // Square root
-    fn sqrt(self) -> Self;
+    fn sqrt(self) -> Result<Self, &'static str>;
 
     // Multiplicative inverse
     fn invert(&self) -> Self;
@@ -95,7 +95,7 @@ impl<const P:u32> Field for PrimeField<P> {
 
     // Multiplication by an integer
     fn zmul(self, y: &i64) -> Self {
-        let res = self.value * y;
+        let res = self.value.mul(y.to_owned());
         PrimeField::<P> {value: res.modulo(&P) }
     }
 
@@ -117,7 +117,7 @@ impl<const P:u32> Field for PrimeField<P> {
     }
 
     fn zpow(&self, y: i64) -> &Self {
-        if y < O {
+        if y < 0 {
             return &self.invert().zpow(-y);
         }
         if y == 0 {
@@ -126,10 +126,10 @@ impl<const P:u32> Field for PrimeField<P> {
             return &self;
         } else if y%2 == 1 {
             let n = (y - 1) / 2;
-            return &self.zpow(&n).mul(&self.zpow(n+1));
+            return &self.zpow(n).mul(&self.zpow(n+1));
         } else {
             let n = y / 2;
-            return &self.zpow(&n).mul(&self.zpow(&n));
+            return &self.zpow(n).mul(&self.zpow(n));
         }
     }
 
@@ -144,8 +144,42 @@ impl<const P:u32> Field for PrimeField<P> {
     }
 
     // Square root
-    fn sqrt(self) -> Self {
-        todo!()
+    fn sqrt(self) -> Result<Self, &'static str> {
+        if self.clone().zpow((i64::from(self.clone().order()) - 1)/2).to_owned() != self.clone().one() {
+            return Err("Non quadratic residue.");
+        }
+
+        let one = self.clone().one();
+        let q = self.clone().order() - 1;
+        let s = 0;
+
+        // Find Q, S such that p - 1 = Q * 2^S
+        while q % 2 == 0 {
+            s += 1;
+            q /= 2;
+        }
+
+        let z = &one;
+        while z.zpow((i64::from(self.clone().order()) - 1) / 2 ) == &one {
+            z = &PrimeField::random_element();
+        }
+        let m = &s;
+        let c  =z.zpow(i64::from(q));
+        let t = self.clone().zpow(i64::from(q));
+        let r = self.clone().zpow((i64::from(q) + 1)/2);
+        let i = 0;
+        while t.to_owned() != self.clone().one() && t.to_owned() != self.clone().zero() {
+            let b = c.zpow(2^(m - i - 1));
+            m = &i;
+            c = &b.square();
+            t = &t.mul(c);
+            r = &r.mul(b);
+        }
+
+        if t.to_owned() == self.clone().zero() {
+            return Ok(self.zero());
+        }
+        return Ok(r.zero());
     }
 
     // Multiplicative inverse
@@ -273,10 +307,10 @@ impl<const P: u32, const N: u32> Field for FiniteField<P,N> {
             return &self;
         } else if y%2 == 1 {
             let n = (y - 1) / 2;
-            return &self.zpow(&n).mul(&self.zpow(n+1));
+            return &self.zpow(n).mul(&self.zpow(n+1));
         } else {
             let n = y / 2;
-            return &self.zpow(&n).mul(&self.zpow(&n));
+            return &self.zpow(n).mul(&self.zpow(n));
         }
     }
 
@@ -288,8 +322,43 @@ impl<const P: u32, const N: u32> Field for FiniteField<P,N> {
         self.clone().mul(&self)
     }
 
-    fn sqrt(self) -> Self {
-        todo!()
+    fn sqrt(self) -> Result<Self, &'static str> {
+        if self.clone().zpow((i64::from(self.clone().order()) - 1)/2).to_owned() != self.clone().one() {
+            return Err("Non quadratic residue.");
+        }
+
+        let one = self.clone().one();
+        let q = self.clone().order() - 1;
+        let s = 0;
+
+        // Find Q, S such that p - 1 = Q * 2^S
+        while q % 2 == 0 {
+            s += 1;
+            q /= 2;
+        }
+
+        let z = &one;
+        while z.zpow((i64::from(self.clone().order()) - 1) / 2 ) == &one {
+            z = &FiniteField::random_element();
+        }
+        let m = &s;
+        let c  =z.zpow(i64::from(q));
+        let t = self.clone().zpow(i64::from(q));
+        let r = self.clone().zpow((i64::from(q) + 1)/2);
+        let i = 0;
+        while t.to_owned() != self.clone().one() && t.to_owned() != self.clone().zero() {
+            let b = c.zpow(2^(m - i - 1));
+            m = &i;
+            c = &b.square();
+            t = &t.mul(c);
+            r = &r.mul(b);
+            i += 1;
+        }
+
+        if t.to_owned() == self.clone().zero() {
+            return Ok(self.zero());
+        }
+        return Ok(r.zero());
     }
 
     fn invert(&self) -> Self {
