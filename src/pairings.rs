@@ -43,14 +43,15 @@ pub fn miller<F: Field + Clone + PartialEq>(
     n: &Integer,
 ) -> Result<F, ErrorKind> {
     // Basic checks
-    if pt_p == &ECPoint::PointAtInfinity {
-        return Err(ErrorKind::InvalidInput("P must not be zero"));
-    }
-    if pt_q == &ECPoint::PointAtInfinity {
-        return Err(ErrorKind::InvalidInput("Q must not be zero"));
-    }
+
+    let one = match (pt_p, pt_q) {
+        (ECPoint::PointAtInfinity, _) => return Err(ErrorKind::InvalidInput("P must not be zero")),
+        (_, ECPoint::PointAtInfinity) => return Err(ErrorKind::InvalidInput("Q must not be zero")),
+        (ECPoint::AffinePoint(x, _), ECPoint::AffinePoint(_, _)) => x.one(),
+    };
+
     if n.is_zero() {
-        return Ok(F::one());
+        return Ok(one);
     }
 
     // Negative values of n are allowed, in which case
@@ -58,8 +59,6 @@ pub fn miller<F: Field + Clone + PartialEq>(
     let sign = n.is_positive();
     //let n = n.abs();
     let nbits = n.abs_ref().complete().to_bits();
-
-    let one = F::one();
 
     let mut t = one;
     let mut i: usize = nbits.len() - 1; // Will not underflow because n != 0
@@ -109,7 +108,10 @@ pub fn weil_pairing<F: Field + Clone + PartialEq>(
     pt_q: ECPoint<F>,
     order: Integer,
 ) -> Result<F, ErrorKind> {
-    let one = F::one();
+    let one = match curve.random_point() {
+        ECPoint::AffinePoint(x, _) => x.one(),
+        ECPoint::PointAtInfinity => todo!(),
+    };
 
     // P = Q, P = 0, or Q = 0
     if pt_p == pt_q || pt_p == ECPoint::PointAtInfinity || pt_q == ECPoint::PointAtInfinity {
