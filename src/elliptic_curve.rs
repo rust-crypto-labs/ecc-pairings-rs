@@ -22,6 +22,22 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
             weierstrass_coefficients: coeffs,
         }
     }
+    // Check that point is on the curve
+    pub fn is_on_curve(self, P: &ECPoint<F>) -> Result<ECPoint<F>, ErrorKind> {
+        let valid = false;
+        match (P) {
+            (ECPoint::PointAtInfinity) => Ok(P),
+            (ECPoint::AffinePoint(x_p,y_p)) => {
+                let [a1, a2, a3, a4,_ , a6] = self.get_a_invariants();
+                // y² + a1 xy + a3 y = x³ + a2 x² + a4 x + a6
+                if y_p.square().add(&y_p.mul(&x_p.mul(&a1))).add(&y_p.mul(&a3)) == x_p.pow(3).add(&x_p.square().mul(&a2)).add(&x_p.mul(&a4)).add(&a6) {
+                        Ok(P);
+                    } else {
+                        ErrorKind::InvalidPoint;
+                    }
+            }
+        }
+    }
 
     // Random point
     pub fn random_point(self) -> ECPoint<F> {
