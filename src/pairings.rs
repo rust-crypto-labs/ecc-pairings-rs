@@ -36,17 +36,17 @@ impl IntegerExt for Integer {
 
 /// Miller's algorithm
 /// Returns f_{n,P}(Q) where div(f_{n,P}) = n(P) - ([n]P) - (n-1)(0)
-pub fn miller<F: Field + Clone + Eq>(
+pub fn miller<F: Field + Clone + PartialEq>(
     curve: &EllipticCurve<F>,
     pt_p: &ECPoint<F>,
     pt_q: &ECPoint<F>,
     n: &Integer,
 ) -> Result<F, ErrorKind> {
     // Basic checks
-    if pt_p.is_zero() {
+    if pt_p == &ECPoint::PointAtInfinity {
         return Err(ErrorKind::InvalidInput("P must not be zero"));
     }
-    if pt_q.is_zero() {
+    if pt_q == &ECPoint::PointAtInfinity {
         return Err(ErrorKind::InvalidInput("Q must not be zero"));
     }
     if n.is_zero() {
@@ -103,7 +103,7 @@ pub fn miller<F: Field + Clone + Eq>(
 /// Weil pairing
 // /!\ I'm not checking that P, Q are on the same curve, I'm not checking that they are of the given order
 // If you input incorrect data you get incorrect results
-pub fn weil_pairing<F: Field + Clone + Eq>(
+pub fn weil_pairing<F: Field + Clone + PartialEq>(
     curve: &EllipticCurve<F>,
     pt_p: ECPoint<F>,
     pt_q: ECPoint<F>,
@@ -112,7 +112,7 @@ pub fn weil_pairing<F: Field + Clone + Eq>(
     let one = F::one();
 
     // P = Q, P = 0, or Q = 0
-    if pt_p.is_equal(&pt_q) || pt_p.is_zero() || pt_q.is_zero() {
+    if pt_p == pt_q || pt_p == ECPoint::PointAtInfinity || pt_q == ECPoint::PointAtInfinity {
         return Ok(one);
     }
 
@@ -135,7 +135,7 @@ pub fn weil_pairing<F: Field + Clone + Eq>(
 //
 // Returns f_{n,P}(Q)^e  where div(f_{n,P}) = n(P) - n(O) and
 // e = (q^k - 1)/n with q = base field size, n = order, and k = embedding degree
-pub fn tate_pairing<F: Field + Clone + Eq>(
+pub fn tate_pairing<F: Field + Clone + PartialEq>(
     curve: &EllipticCurve<F>,
     pt_p: &ECPoint<F>,
     pt_q: &ECPoint<F>,
@@ -177,7 +177,7 @@ pub fn tate_pairing<F: Field + Clone + Eq>(
 // Q is on E/Fq^k where k = embedding degree
 // P in ker(Frob - 1)
 // Q in ker(Frob - q)
-pub fn ate_pairing<F: Field + Clone + Eq>(
+pub fn ate_pairing<F: Field + Clone + PartialEq>(
     curve: &EllipticCurve<F>,
     pt_p: &ECPoint<F>,
     pt_q: &ECPoint<F>,

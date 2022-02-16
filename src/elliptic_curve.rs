@@ -272,14 +272,4 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
     pub fn new_affine(x: F, y: F) -> Self {
         ECPoint::AffinePoint(x, y)
     }
-
-    // Returns true if and only if this is the point at infinity
-    pub fn is_zero(&self) -> bool {
-        ECPoint::PointAtInfinity.is_equal(self)
-    }
-
-    // Returns true if the two points are equal
-    pub fn is_equal(&self, other: &Self) -> bool {
-        self == other
-    }
 }
