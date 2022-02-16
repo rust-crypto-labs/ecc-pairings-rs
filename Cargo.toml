@@ -1,9 +1,7 @@
 [package]
+authors = ["r.g.s. <anx99@rgs.com>", "Romain Ninot <romain.ninot@outlook.fr>"]
+edition = "2021"
 name = "pairings"
 version = "0.1.0"
-authors = ["r.g.s. <anx99@rgs.com>", "Romain Ninot <romain.ninot@outlook.fr>"]
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+rug = "1.13.0"

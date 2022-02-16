@@ -1,54 +1,52 @@
-use std::ops::{Add, Mul};
-
 use rug::Integer;
-// Generic finite field operations
-pub trait Field: Sized {
-    // Neutral element for addition
-    fn zero(self) -> Self;
+/// Generic finite field operations
+pub trait Field {
+    /// Neutral element for addition
+    fn zero() -> Self;
 
-    // Neutral element for multiplication
-    fn one(self) -> Self;
+    /// Neutral element for multiplication
+    fn one() -> Self;
 
-    // Addition
+    /// Addition
     fn add(self, y: &Self) -> Self;
 
-    // Multiplication
-    fn mul(&self, y: &Self) -> Self;
+    /// Multiplication
+    fn mul(self, y: &Self) -> Self;
 
-    // Multiplication by an integer
-    fn zmul(self, y: &i64) -> Self;
+    /// Multiplication by an integer
+    fn zmul(self, y: i64) -> Self;
 
-    // Power
-    fn pow(&self, y: &Integer) -> &Self;
+    /// Power
+    fn pow(self, y: &Integer) -> Self;
 
-    // Int power
-    fn zpow(&self, y: i64) -> &Self;
+    /// Int power
+    fn zpow(self, y: i64) -> Self;
 
-    // Division
+    /// Division
     fn div(self, y: &Self) -> Self;
 
-    // Squaring
+    /// Squaring
     fn square(self) -> Self;
 
-    // Square root
+    /// Square root
     fn sqrt(self) -> Result<Self, &'static str>;
 
-    // Multiplicative inverse
-    fn invert(&self) -> Self;
+    /// Multiplicative inverse
+    fn invert(self) -> Self;
 
-    // Additive inverse
+    /// Additive inverse
     fn neg(self) -> Self;
 
-    // Degree of the extension
+    /// Degree of the extension
     fn degree() -> usize;
 
-    // Field order
+    /// Field order
     fn order(self) -> u32;
 
-    // Base field order
+    /// Base field order
     fn base_order() -> Integer;
 
-    // Random field point
+    /// Random field point
     fn random_element() -> Self;
 }
 
@@ -174,8 +172,8 @@ impl<const P:u32> Field for PrimeField<P> {
             let b = c.zpow(2^(m - i - 1));
             m = &i;
             c = &b.square();
-            t = &t.mul(c);
-            r = &r.mul(b);
+            t = &t.mul(&c);
+            r = &r.mul(&b);
         }
 
         if t.to_owned() == self.clone().zero() {
@@ -352,8 +350,8 @@ impl<const P: u32, const N: usize> Field for FiniteField<P,N> {
             let b = c.zpow(2^(m - i - 1));
             m = &i;
             c = &b.square();
-            t = &t.mul(c);
-            r = &r.mul(b);
+            t = &t.mul(&c);
+            r = &r.mul(&b);
             i += 1;
         }
 

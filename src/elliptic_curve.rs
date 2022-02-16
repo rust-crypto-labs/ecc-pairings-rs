@@ -1,4 +1,4 @@
-use crate::field::Field;
+use crate::{errors::ErrorKind, field::Field};
 
 // Generic elliptic curve
 #[derive(Clone, Debug, PartialEq)]
@@ -8,15 +8,9 @@ pub struct EllipticCurve<F: Field> {
 
 // Rational point on an elliptic curve (affine coords)
 #[derive(Clone, Debug, PartialEq)]
-pub struct RationalPoint<F: Field + Clone> {
-    pub curve: EllipticCurve<F>,
-    pub coord: (F, F),
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub enum ECPoint<F: Field + Clone> {
-    RATIONALPOINT(RationalPoint<F>),
-    INFPOINT(EllipticCurve<F>),
+    AffinePoint(F, F),
+    PointAtInfinity,
 }
 
 // Elliptic curve data structure
@@ -58,92 +52,72 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
         };
         let rand_y = half.mul(&b.clone().neg().add(sq));
 
-        ECPoint::RATIONALPOINT(RationalPoint {
-            curve: self,
-            coord: (rand_x, rand_y),
-        })
+        ECPoint::AffinePoint(rand_x, rand_y)
     }
 
-    pub fn infinity_point(self) -> ECPoint<F> {
-        ECPoint::INFPOINT(self)
+    pub fn infinity_point() -> ECPoint<F> {
+        ECPoint::PointAtInfinity
     }
 
     // Get long Weierstrass coeffs
     pub fn get_a_invariants(&self) -> [F; 6] {
         self.weierstrass_coefficients.clone()
     }
-}
-
-// Point operations
-impl<F: Field + Clone + PartialEq> ECPoint<F> {
-    // New point from affine coords
-    pub fn new_affine(curve: &EllipticCurve<F>, x: F, y: F) -> Self {
-        ECPoint::RATIONALPOINT(RationalPoint {
-            curve: curve.clone(),
-            coord: (x, y),
-        })
-    }
-
-    // Returns true if and only if this is the point at infinity
-    pub fn is_zero(&self) -> bool {
-        match self {
-            ECPoint::INFPOINT(_c) => true,
-            ECPoint::RATIONALPOINT(_pt) => false,
-        }
-    }
-
-    // Returns true if the two points are equal
-    pub fn is_equal(&self, other: &Self) -> bool {
-        self == other
-    }
 
     // Returns the evaluation of the line PQ at R, where P is self
     // /!\ R cannot be the zero point
-    pub fn line(&self, pt_q: &Self, pt_r: &Self) -> Result<F, &'static str> {
+    pub fn line(
+        &self,
+        pt_p: &ECPoint<F>,
+        pt_q: &ECPoint<F>,
+        pt_r: &ECPoint<F>,
+    ) -> Result<F, ErrorKind> {
         let (x_r, y_r) = match pt_r {
             // Case P = Q = 0
-            ECPoint::INFPOINT(_c) => return Err("R cannot be the point at infinity"),
-            ECPoint::RATIONALPOINT(pt_r) => &pt_r.coord,
+            ECPoint::PointAtInfinity => {
+                return Err(ErrorKind::InvalidInput("R cannot be the point at infinity"))
+            }
+            ECPoint::AffinePoint(x, y) => (x, y),
         };
 
-        match (self, pt_q) {
+        match (pt_p, pt_q) {
             // Case P = Q = 0
-            (ECPoint::INFPOINT(_c1), ECPoint::INFPOINT(_c2)) => Ok(x_r.one()),
-            (ECPoint::INFPOINT(_c), ECPoint::RATIONALPOINT(pt_q)) => {
+            (ECPoint::PointAtInfinity, ECPoint::PointAtInfinity) => Ok(F::one()),
+            (ECPoint::PointAtInfinity, ECPoint::AffinePoint(x_q, _)) => {
                 // Case P = 0
                 // xR - xQ
-                let (x_q, _) = pt_q.clone().coord;
-                Ok(x_r.clone().add(&x_q.neg()))
+                let x_q_neg = x_q.clone().neg();
+                Ok(x_r.clone().add(&x_q_neg))
             }
-            (ECPoint::RATIONALPOINT(pt_p), ECPoint::INFPOINT(_c)) => {
+            (ECPoint::AffinePoint(x_p, _), ECPoint::PointAtInfinity) => {
                 // Case Q = 0
                 // xR - xP
-                let (x_p, _) = pt_p.clone().coord;
-                Ok(x_r.clone().add(&x_p.neg()))
+                let x_p_neg = x_p.clone().neg();
+                Ok(x_r.clone().add(&x_p_neg))
             }
-            (ECPoint::RATIONALPOINT(pt_p), ECPoint::RATIONALPOINT(pt_q)) => {
-                let (x_p, y_p) = pt_p.clone().coord;
-                let (x_q, y_q) = pt_q.clone().coord;
+            (ECPoint::AffinePoint(x_p, y_p), ECPoint::AffinePoint(x_q, y_q)) => {
+                let x_p_neg = x_p.clone().neg();
+                let y_p_neg = y_p.clone().neg();
 
-                if pt_p != pt_q {
+                if (x_p != x_q) || (y_p != y_q) {
                     // Case P != Q
                     if x_p == x_q {
                         // Case xP = xQ
                         // xR - xP
-                        Ok(x_r.clone().add(&x_p.neg()))
+                        Ok(x_r.clone().add(&x_p_neg))
                     } else {
                         // Case xP != xQ
-                        let num = y_q.add(&x_p.clone().neg());
-                        let denom = x_q.add(&x_p.clone().neg());
+                        let num = x_p_neg.clone().add(y_q);
+                        let denom = x_p_neg.clone().add(x_q);
                         let slope = num.div(&denom);
 
-                        let xdiff = (x_r.clone().add(&x_p.neg())).mul(&slope).neg();
-                        let ydiff = y_r.clone().add(&y_p.neg());
+                        let xdiff = (x_r.clone().add(&x_p_neg)).mul(&slope).neg();
+                        let ydiff = y_r.clone().add(&y_p_neg);
                         Ok(xdiff.add(&ydiff))
                     }
                 } else {
                     // Case P = Q
-                    let a = pt_p.curve.get_a_invariants();
+                    let a = self.get_a_invariants();
                     let (a1, a2, a3, a4) = (&a[0], &a[1], &a[2], &a[3]);
 
                     // 3x² + 2x a2 - y a1 + a4
@@ -160,12 +134,12 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
 
                     if denom == denom.zero() {
                         // xR - xP
-                        Ok(x_r.clone().add(&x_p.neg()))
+                        Ok(x_r.clone().add(&x_p_neg))
                     } else {
                         let slope = num.div(&denom);
 
-                        let xdiff = (x_r.clone().add(&x_p.neg())).mul(&slope).neg();
-                        let ydiff = y_r.clone().add(&y_p.neg());
+                        let xdiff = (x_r.clone().add(&x_p_neg)).mul(&slope).neg();
+                        let ydiff = y_r.clone().add(&y_p_neg);
 
                         Ok(ydiff.add(&xdiff))
                     }
@@ -174,22 +148,22 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
         }
     }
 
-    // Returns the addition of self with Q
-    pub fn add(&self, pt_q: &Self) -> Self {
-        let ((x_p, y_p), c) = match self {
-            ECPoint::INFPOINT(_c) => return pt_q.clone(),
-            ECPoint::RATIONALPOINT(pt) => (&pt.coord, &pt.curve),
+    // Returns the addition of P with Q
+    pub fn add(&self, pt_p: &ECPoint<F>, pt_q: &ECPoint<F>) -> ECPoint<F> {
+        let (x_p, y_p) = match pt_p {
+            ECPoint::PointAtInfinity => return pt_q.clone(),
+            ECPoint::AffinePoint(x, y) => (x, y),
         };
         let (x_q, y_q) = match pt_q {
-            ECPoint::INFPOINT(_c) => return self.clone(),
-            ECPoint::RATIONALPOINT(pt) => &pt.coord,
+            ECPoint::PointAtInfinity => return pt_p.clone(),
+            ECPoint::AffinePoint(x, y) => (x, y),
         };
 
-        let a = &c.get_a_invariants();
+        let a = self.get_a_invariants();
         let (a1, a2, a3, a4, a6) = (&a[0], &a[1], &a[2], &a[3], &a[5]);
 
-        if x_p == x_q && y_p.clone().add(y_q).add(&a1.clone().mul(x_q)).add(a3) == x_p.zero() {
-            c.clone().infinity_point()
+        if x_p == x_q && y_p.clone().add(y_q).add(&a1.clone().mul(x_q)).add(a3) == F::zero() {
+            EllipticCurve::infinity_point()
         } else {
             let lambda;
             let nu;
@@ -236,21 +210,18 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
                 .add(&x.clone().mul(&lambda.add(a1)))
                 .neg();
 
-            ECPoint::RATIONALPOINT(RationalPoint {
-                curve: c.clone(),
-                coord: (x, y),
-            })
+            ECPoint::AffinePoint(x, y)
         }
     }
 
-    // Doubles self
-    pub fn double(&self) -> Self {
-        let ((x_p, y_p), c) = match self {
-            ECPoint::INFPOINT(_c) => return self.clone(),
-            ECPoint::RATIONALPOINT(pt) => (&pt.coord, &pt.curve),
+    // Doubles P
+    pub fn double(&self, pt_p: &ECPoint<F>) -> ECPoint<F> {
+        let (x_p, y_p) = match pt_p {
+            ECPoint::PointAtInfinity => return pt_p.clone(),
+            ECPoint::AffinePoint(x, y) => (x, y),
         };
 
-        let a = &c.get_a_invariants();
+        let a = self.get_a_invariants();
         let (a1, a2, a3, a4) = (&a[0], &a[1], &a[2], &a[3]);
 
         let lambda = &a1
@@ -282,26 +253,27 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
             .add(&x_p.clone().mul(lambda))
             .add(&y_p.clone().neg());
 
-        ECPoint::RATIONALPOINT(RationalPoint {
-            curve: c.clone(),
-            coord: (res_x, res_y),
-        })
+        ECPoint::AffinePoint(res_x, res_y)
     }
 
-    // Returns the inverse of self
+    // Returns the inverse of P
     // /!\ Can not invert zero point
-    pub fn invert(&self) -> Result<Self, &'static str> {
-        let ((x, y), c) = match self {
-            ECPoint::INFPOINT(_c) => return Err("P must not be zero"),
-            ECPoint::RATIONALPOINT(pt) => (&pt.coord, &pt.curve),
+    pub fn invert(&self, pt_p: &ECPoint<F>) -> Result<ECPoint<F>, ErrorKind> {
+        let (x, y) = match pt_p {
+            ECPoint::PointAtInfinity => return Err(ErrorKind::InvalidInput("P must not be zero")),
+            ECPoint::AffinePoint(x, y) => (x, y),
         };
-        let a = &c.get_a_invariants();
-        let (a1, a3) = (&a[0], &a[2]);
-        let new_y = a3.clone().add(&a1.clone().mul(x)).add(y).neg();
+        let [a1, _, a3, _, _, _] = self.get_a_invariants();
+        let new_y = a3.add(&a1.mul(x)).add(y).neg();
 
-        Ok(ECPoint::RATIONALPOINT(RationalPoint {
-            curve: c.clone(),
-            coord: (x.clone(), new_y),
-        }))
+        Ok(ECPoint::AffinePoint(x.clone(), new_y))
+    }
+}
+
+// Point on a curve
+impl<F: Field + Clone + PartialEq> ECPoint<F> {
+    // New point from affine coords
+    pub fn new_affine(x: F, y: F) -> Self {
+        ECPoint::AffinePoint(x, y)
     }
 }
