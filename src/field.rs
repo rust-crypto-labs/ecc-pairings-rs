@@ -40,7 +40,7 @@ pub trait Field: Sized {
     fn neg(self) -> Self;
 
     // Degree of the extension
-    fn degree() -> u32;
+    fn degree() -> usize;
 
     // Field order
     fn order(self) -> u32;
@@ -52,7 +52,7 @@ pub trait Field: Sized {
     fn random_element() -> Self;
 }
 
-pub enum Scalar<const P:u32, const N:u32> {
+pub enum Scalar<const P:u32, const N:usize> {
     PFScalar(PrimeField<P>),
     FFScalar(FiniteField<P,N>),
 }
@@ -63,7 +63,7 @@ pub struct PrimeField<const P:u32> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct FiniteField<const P: u32, const N: u32> {
+pub struct FiniteField<const P: u32, const N: usize> {
     pub coords: [PrimeField<P>; N],
     pub polynomial: [PrimeField<P>; N],
 }
@@ -196,7 +196,7 @@ impl<const P:u32> Field for PrimeField<P> {
     }
 
     // Degree of the extension
-    fn degree() -> u32 {
+    fn degree() -> usize {
         return 1;
     }
 
@@ -216,7 +216,7 @@ impl<const P:u32> Field for PrimeField<P> {
     }
 }
 
-impl<const P: u32, const N: u32> Field for FiniteField<P,N> {
+impl<const P: u32, const N: usize> Field for FiniteField<P,N> {
     // Neutral element for addition
     fn zero(self) -> Self {
         let zero = PrimeField { value: Integer::new() };
@@ -249,30 +249,30 @@ impl<const P: u32, const N: u32> Field for FiniteField<P,N> {
         let I = self.clone().polynomial;
 
         // Create a polynomial of degree 2N - 2
-        const n:usize = N as usize;
-        let Q = [zero; 2 * n - 1];
+        // Must be a vec until const generic operations are allowed
+        let Q = vec![zero; 2 * N - 1];
 
         // Create remainder polynomial
-        let R = [zero; n];
+        let R = [zero; N];
 
         // Polynomial multiplication A * B
-        for k in 0..(2 * n - 1) {
+        for k in 0..(2 * N - 1) {
             for l in 0..(k+1) {
-                if k - l < n && l < n {
+                if k - l < N && l < N {
                     Q[k] = Q[k].add(&A[k-l].mul(&B[l]));
                 }
             }
         }
 
         // Polynomial euclidian remainder
-        for l in n..(2*n-1) {
-            let r = 2*n - 2 - l;
-            for k in 0..n {
-                Q[k+r-n] = &Q[k+r-n].add(&Q[r].mul(&I[k]));
+        for l in N..(2*N-1) {
+            let r = 2*N - 2 - l;
+            for k in 0..N {
+                Q[k+r-N] = Q[k+r-N].add(&Q[r].mul(&I[k]));
             }
         }
 
-        for i  in 0..n {
+        for i  in 0..N {
             R[i] = Q[i];
         }
         FiniteField { coords:R, polynomial: self.polynomial }
@@ -378,7 +378,7 @@ impl<const P: u32, const N: u32> Field for FiniteField<P,N> {
     }
 
 
-    fn degree() -> u32 {
+    fn degree() -> usize {
         N
     }
 
