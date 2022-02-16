@@ -48,11 +48,15 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
             .add(&rand_x.clone().mul(&a4.clone()))
             .add(&a6.clone())
             .neg();
-        let half = F::one().zmul(2).invert();
-        let delta = &b.clone().square().add(&c.clone().zmul(4).neg());
+        let half = c.one().zmul(&2).invert();
+        let delta = &b.clone().square().add(&c.clone().zmul(&4).neg());
 
         // y = ( - b + sqrt( delta ) ) / 2
-        let rand_y = half.mul(&b.clone().neg().add(&delta.clone().sqrt()));
+        let sq = match &delta.sqrt() {
+            Ok(x) => x,
+            Err(_) => todo!(),
+        };
+        let rand_y = half.mul(&b.clone().neg().add(sq));
 
         ECPoint::RATIONALPOINT(RationalPoint {
             curve: self,
@@ -104,7 +108,7 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
 
         match (self, pt_q) {
             // Case P = Q = 0
-            (ECPoint::INFPOINT(_c1), ECPoint::INFPOINT(_c2)) => Ok(F::one()),
+            (ECPoint::INFPOINT(_c1), ECPoint::INFPOINT(_c2)) => Ok(x_r.one()),
             (ECPoint::INFPOINT(_c), ECPoint::RATIONALPOINT(pt_q)) => {
                 // Case P = 0
                 // xR - xQ
@@ -146,15 +150,15 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
                     let num = x_p
                         .clone()
                         .square()
-                        .zmul(3)
+                        .zmul(&3)
                         .add(&y_p.clone().mul(a1).neg())
                         .add(a4)
-                        .add(&x_p.clone().mul(a2).zmul(2));
+                        .add(&x_p.clone().mul(a2).zmul(&2));
 
                     // 2y + x a1 + a3
-                    let denom = y_p.clone().zmul(2).add(a3).add(&x_p.clone().mul(a1));
+                    let denom = y_p.clone().zmul(&2).add(a3).add(&x_p.clone().mul(a1));
 
-                    if denom == F::zero() {
+                    if denom == denom.zero() {
                         // xR - xP
                         Ok(x_r.clone().add(&x_p.neg()))
                     } else {
@@ -184,7 +188,7 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
         let a = &c.get_a_invariants();
         let (a1, a2, a3, a4, a6) = (&a[0], &a[1], &a[2], &a[3], &a[5]);
 
-        if x_p == x_q && y_p.clone().add(y_q).add(&a1.clone().mul(x_q)).add(a3) == F::zero() {
+        if x_p == x_q && y_p.clone().add(y_q).add(&a1.clone().mul(x_q)).add(a3) == x_p.zero() {
             c.clone().infinity_point()
         } else {
             let lambda;
@@ -192,21 +196,21 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
             if x_p == x_q {
                 lambda = (a4
                     .clone()
-                    .add(&x_p.clone().square().zmul(3))
-                    .add(&a2.clone().mul(x_p).zmul(2))
+                    .add(&x_p.clone().square().zmul(&3))
+                    .add(&a2.clone().mul(x_p).zmul(&2))
                     .add(&a1.clone().mul(y_p).neg()))
                 .div(
                     &a3.clone()
-                        .add(&y_p.clone().zmul(2))
+                        .add(&y_p.clone().zmul(&2))
                         .add(&a1.clone().mul(x_p)),
                 );
                 nu = (x_p.clone().square().mul(x_p).neg())
                     .add(&a4.clone().mul(x_p))
-                    .add(&a6.clone().zmul(2))
+                    .add(&a6.clone().zmul(&2))
                     .add(&a3.clone().mul(y_p).neg())
                     .div(
                         &a3.clone()
-                            .add(&y_p.clone().zmul(2))
+                            .add(&y_p.clone().zmul(&2))
                             .add(&a1.clone().mul(x_p)),
                     );
             } else {
@@ -251,13 +255,13 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
 
         let lambda = &a1
             .clone()
-            .zmul(3)
-            .add(&x_p.clone().mul(&a2.clone()).zmul(2))
+            .zmul(&3)
+            .add(&x_p.clone().mul(&a2.clone()).zmul(&2))
             .add(&y_p.clone().mul(&a1.clone()).neg())
             .add(&a4.clone())
             .mul(
                 &y_p.clone()
-                    .zmul(2)
+                    .zmul(&2)
                     .add(&x_p.clone().mul(&a1.clone()))
                     .add(&a3.clone())
                     .invert(),
@@ -267,7 +271,7 @@ impl<F: Field + Clone + PartialEq> ECPoint<F> {
             .square()
             .add(&a1.clone().mul(&lambda.clone()))
             .add(&a2.clone().neg())
-            .add(&x_p.clone().zmul(2).neg());
+            .add(&x_p.clone().zmul(&2).neg());
 
         let res_y = res_x
             .clone()

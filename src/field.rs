@@ -1,6 +1,6 @@
 use std::ops::{Add, Mul};
 
-use crate::bigint::BigInt;
+use rug::Integer;
 // Generic finite field operations
 pub trait Field: Sized {
     // Neutral element for addition
@@ -19,7 +19,7 @@ pub trait Field: Sized {
     fn zmul(self, y: &i64) -> Self;
 
     // Power
-    fn pow(&self, y: &BigInt) -> &Self;
+    fn pow(&self, y: &Integer) -> &Self;
 
     // Int power
     fn zpow(&self, y: i64) -> &Self;
@@ -46,7 +46,7 @@ pub trait Field: Sized {
     fn order(self) -> u32;
 
     // Base field order
-    fn base_order() -> BigInt;
+    fn base_order() -> Integer;
 
     // Random field point
     fn random_element() -> Self;
@@ -59,7 +59,7 @@ pub enum Scalar<const P:u32, const N:u32> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PrimeField<const P:u32> {
-    pub value: BigInt,
+    pub value: Integer,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -71,12 +71,14 @@ pub struct FiniteField<const P: u32, const N: u32> {
 impl<const P:u32> Field for PrimeField<P> {
     // Neutral element for addition
     fn zero(self) -> Self {
-        return PrimeField::<P> {value: BigInt::zero() }
+        let z = Integer::new();
+        return PrimeField {value: z }
     }
 
     // Neutral element for multiplication
     fn one(self) -> Self {
-        return PrimeField::<P> {value: BigInt::one()};
+        let one = Integer::from(1);
+        return PrimeField {value: one};
     }
 
     // Addition
@@ -100,16 +102,16 @@ impl<const P:u32> Field for PrimeField<P> {
     }
 
     // Power
-    fn pow(&self, y: &BigInt) -> &Self {
+    fn pow(&self, y: &Integer) -> &Self {
         if y.is_zero() {
             return &self.one();
-        } else if y.eq(&BigInt::one()) {
+        } else if y.eq(&Integer::from(1)) {
             return &self;
         }
 
         if y.is_odd() {
-            let n = (y.sub(&BigInt::one())).div(2);
-            return &self.pow(&n).mul(&self.pow(&n.add(BigInt::one())));
+            let n = (y.sub(&Integer::from(1))).div(2);
+            return &self.pow(&n).mul(&self.pow(&n.add(Integer::from(1))));
         } else {
             let n = y.div(2);
             return &self.pow(&n).mul(&self.pow(&n));
@@ -204,7 +206,7 @@ impl<const P:u32> Field for PrimeField<P> {
     }
 
     // Base field order
-    fn base_order() -> BigInt {
+    fn base_order() -> Integer {
         P
     }
 
@@ -217,14 +219,14 @@ impl<const P:u32> Field for PrimeField<P> {
 impl<const P: u32, const N: u32> Field for FiniteField<P,N> {
     // Neutral element for addition
     fn zero(self) -> Self {
-        let zero = PrimeField { value: BigInt::zero() };
+        let zero = PrimeField { value: Integer::new() };
         return FiniteField::<P,N> { coords: [zero; N], polynomial: self.polynomial }
     }
 
     // Neutral element for multiplication
     fn one(self) -> Self {
-        let one = PrimeField { value: BigInt::one() };
-        let zero = PrimeField{value: BigInt::zero()};
+        let one = PrimeField { value: Integer::from(1) };
+        let zero = PrimeField{value: Integer::new()};
         let res = [zero; N];
         res[0] = one;
         return FiniteField::<P,N> { coords: res, polynomial: self.polynomial }
@@ -240,7 +242,7 @@ impl<const P: u32, const N: u32> Field for FiniteField<P,N> {
     }
 
     fn mul(&self, y: &Self) -> Self {
-        let zero = PrimeField { value: BigInt::zero() };
+        let zero = PrimeField { value: Integer::new() };
         // Initialize polynomials
         let A = self.clone().coords;
         let B = y.coords;
@@ -284,16 +286,16 @@ impl<const P: u32, const N: u32> Field for FiniteField<P,N> {
         return FiniteField::<P,N> {coords: x, polynomial: self.polynomial};
     }
 
-    fn pow(&self, y: &BigInt) -> &Self {
+    fn pow(&self, y: &Integer) -> &Self {
         if y.is_zero() {
             return &self.one();
-        } else if y.eq(&BigInt::one()) {
+        } else if y.eq(&Integer::from(1)) {
             return &self;
         }
 
         if y.is_odd() {
-            let n = (y.sub(&BigInt::one())).div(2);
-            return &self.pow(&n).mul(&self.pow(&n.add(BigInt::one())));
+            let n = (y.sub(&Integer::from(1))).div(2);
+            return &self.pow(&n).mul(&self.pow(&n.add(Integer::from(1))));
         } else {
             let n = y.div(2);
             return &self.pow(&n).mul(&self.pow(&n));
@@ -384,8 +386,8 @@ impl<const P: u32, const N: u32> Field for FiniteField<P,N> {
         todo!()
     }
 
-    fn base_order() -> BigInt {
-        P
+    fn base_order() -> Integer {
+        Integer.from(P)
     }
 
     fn random_element() -> Self {
