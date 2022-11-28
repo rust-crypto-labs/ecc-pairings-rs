@@ -1,9 +1,11 @@
 use crate::{errors::ErrorKind, field::Field};
 
+type WCoeffs<F> = (F, F, F, F, F, F);
+
 // Generic elliptic curve
 #[derive(Clone, Debug, PartialEq)]
 pub struct EllipticCurve<F: Field> {
-    weierstrass_coefficients: [F; 6],
+    weierstrass_coefficients: WCoeffs<F>,
 }
 
 // Rational point on an elliptic curve (affine coords)
@@ -17,16 +19,36 @@ pub enum ECPoint<F: Field + Clone> {
 impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
     // New curve, long Weierstrass form
     // y² + a1 xy + a3 y = x³ + a2 x² + a4 x + a6
-    pub fn new_long_weierstrass(coeffs: [F; 6]) -> Self {
+    pub fn new_long_weierstrass(coeffs: WCoeffs<F>) -> Self {
         EllipticCurve {
             weierstrass_coefficients: coeffs,
         }
     }
 
+    // Check that point is on the curve
+    pub fn is_on_curve(self, p: &ECPoint<F>) -> bool {
+        match p {
+            ECPoint::PointAtInfinity => true,
+            ECPoint::AffinePoint(x_p, y_p) => {
+                let (a1, a2, a3, a4, _, a6) = self.get_a_invariants();
+                // y² + a1 xy + a3 y = x³ + a2 x² + a4 x + a6
+                y_p.clone()
+                    .square()
+                    .add(&y_p.clone().mul(&x_p.clone().mul(a1)))
+                    .add(&y_p.clone().mul(a3))
+                    == x_p
+                        .clone()
+                        .zpow(3)
+                        .add(&x_p.clone().square().mul(a2))
+                        .add(&x_p.clone().mul(a4))
+                        .add(a6)
+            }
+        }
+    }
+
     // Random point
-    pub fn random_point(&self) -> ECPoint<F> {
-        let a = self.get_a_invariants();
-        let (a1, a2, a3, a4, a6) = (&a[0], &a[1], &a[2], &a[3], &a[5]);
+    pub fn random_point(self) -> ECPoint<F> {
+        let (a1, a2, a3, a4, _, a6) = self.get_a_invariants();
         // Get a random x
         let rand_x = F::random_element();
 
@@ -64,8 +86,8 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
     }
 
     // Get long Weierstrass coeffs
-    pub fn get_a_invariants(&self) -> [F; 6] {
-        self.weierstrass_coefficients.clone()
+    pub fn get_a_invariants(&self) -> &WCoeffs<F> {
+        &self.weierstrass_coefficients
     }
 
     // Returns the evaluation of the line PQ at R, where P is self
@@ -126,8 +148,7 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
                     }
                 } else {
                     // Case P = Q
-                    let a = self.get_a_invariants();
-                    let (a1, a2, a3, a4) = (&a[0], &a[1], &a[2], &a[3]);
+                    let (a1, a2, a3, a4, _, _) = self.get_a_invariants();
 
                     // 3x² + 2x a2 - y a1 + a4
                     let num = x_p
@@ -171,12 +192,9 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
             ECPoint::AffinePoint(x, y) => (x, y),
         };
 
-        let zero = x_p.zero();
+        let (a1, a2, a3, a4, _, a6) = self.get_a_invariants();
 
-        let a = self.get_a_invariants();
-        let (a1, a2, a3, a4, a6) = (&a[0], &a[1], &a[2], &a[3], &a[5]);
-
-        if x_p == x_q && y_p.clone().add(y_q).add(&a1.clone().mul(x_q)).add(a3) == zero {
+        if x_p == x_q && (y_p.clone().add(y_q).add(&a1.clone().mul(x_q)).add(a3)).is_zero() {
             EllipticCurve::infinity_point()
         } else {
             let denom;
@@ -234,8 +252,7 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
             ECPoint::AffinePoint(x, y) => (x, y),
         };
 
-        let a = self.get_a_invariants();
-        let (a1, a2, a3, a4) = (&a[0], &a[1], &a[2], &a[3]);
+        let (a1, a2, a3, a4, _, _) = self.get_a_invariants();
 
         let coeff = match y_p
             .clone()
@@ -281,8 +298,8 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
             ECPoint::PointAtInfinity => return Err(ErrorKind::InvalidInput("P must not be zero")),
             ECPoint::AffinePoint(x, y) => (x, y),
         };
-        let [a1, _, a3, _, _, _] = self.get_a_invariants();
-        let new_y = a3.add(&a1.mul(x)).add(y).neg();
+        let (a1, _, a3, _, _, _) = self.get_a_invariants();
+        let new_y = a3.clone().add(&a1.clone().mul(x)).add(y).neg();
 
         Ok(ECPoint::AffinePoint(x.clone(), new_y))
     }

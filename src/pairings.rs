@@ -123,10 +123,7 @@ pub fn weil_pairing<F: Field + Clone + PartialEq>(
     pt_q: ECPoint<F>,
     order: Integer,
 ) -> Result<F, ErrorKind> {
-    let one = match curve.random_point() {
-        ECPoint::AffinePoint(x, _) => x.one(),
-        ECPoint::PointAtInfinity => todo!(),
-    };
+    let one = F::random_element().one();
 
     // P = Q, P = 0, or Q = 0
     if pt_p == pt_q || pt_p == ECPoint::PointAtInfinity || pt_q == ECPoint::PointAtInfinity {
