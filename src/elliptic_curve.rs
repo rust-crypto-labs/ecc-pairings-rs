@@ -46,7 +46,7 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
     pub fn random_point(self) -> ECPoint<F> {
         let (a1, a2, a3, a4, _, a6) = self.get_a_invariants();
         // Get a random x
-        let rand_x = F::random_element();
+        let rand_x = self.weierstrass_coefficients.0.random_element();
 
         // y² + ( a1 x + a3 ) * y = x³ + a2 x² + a4 x + a6
         // b = a1 x + a3

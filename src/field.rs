@@ -1,5 +1,5 @@
 use crate::errors::ErrorKind;
-use rug::Integer;
+use rug::{Integer, ops::DivRounding, rand::{RandState}};
 
 /// Generic finite field operations
 pub trait Field {
@@ -36,6 +36,8 @@ pub trait Field {
     /// Square root
     fn sqrt(&self) -> Result<Box<Self>, ErrorKind>;
 
+    fn is_square(&self) -> bool;
+
     /// Multiplicative inverse
     fn invert(&self) -> Result<Box<Self>, ErrorKind>;
 
@@ -52,7 +54,7 @@ pub trait Field {
     fn base_order() -> Integer;
 
     /// Random field point
-    fn random_element() -> Self;
+    fn random_element(&self) -> Self;
 }
 
 pub enum Scalar<const P: u32, const N: usize> {
@@ -182,7 +184,7 @@ impl<const P: u32> Field for PrimeField<P> {
 
         let mut z = one.clone();
         while z.zpow(q / 2) == one {
-            z = PrimeField::<P>::random_element();
+            z = z.random_element();
         }
         let mut m = s;
         let mut c = z.zpow(q);
@@ -203,6 +205,11 @@ impl<const P: u32> Field for PrimeField<P> {
             return Ok(Box::new(self.zero()));
         }
         Ok(Box::new(r.zero()))
+    }
+
+    fn is_square(&self) -> bool {
+        // Legendre's symbol
+        self.value.legendre(&Integer::from_f32(P as f32).unwrap()) == 1
     }
 
     // Multiplicative inverse
@@ -238,8 +245,9 @@ impl<const P: u32> Field for PrimeField<P> {
     }
 
     // Random field point
-    fn random_element() -> Self {
-        todo!()
+    fn random_element(&self) -> Self {
+        let rand = RandState::new();
+        PrimeField {value: Integer::from(P).random_below(&mut rand )}
     }
 }
 
@@ -390,7 +398,7 @@ impl<const P: u32, const N: usize> Field for FiniteField<P, N> {
 
         let mut z = one.clone();
         while z.zpow(q / 2) == one {
-            z = FiniteField::random_element();
+            z = z.mul(&z);
         }
         let mut m = s;
         let mut c = z.zpow(q);
@@ -411,6 +419,11 @@ impl<const P: u32, const N: usize> Field for FiniteField<P, N> {
             return Ok(Box::new(zero));
         }
         Ok(Box::new(r.zero()))
+    }
+
+    fn is_square(&self) -> bool {
+        // Euler's criteria
+        return self.pow(&Integer::from_f32((P - 1).div_euc(2) as f32).unwrap()).eq(&self.one());
     }
 
     fn invert(&self) -> Result<Box<Self>, ErrorKind> {
@@ -449,7 +462,14 @@ impl<const P: u32, const N: usize> Field for FiniteField<P, N> {
         Integer::from(P)
     }
 
-    fn random_element() -> Self {
-        todo!()
+    fn random_element(&self) -> Self {
+        let z: PrimeField<P> = PrimeField {
+            value: Default::default()
+        };
+        FiniteField {
+            coords: 
+            vec![z.random_element(); N],
+            polynomial: self.polynomial,
+        }
     }
 }
