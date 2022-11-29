@@ -55,9 +55,9 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
         // c = - ( x³ + a2 x² + a4 x + a6 )
         let c = &rand_x
             .zpow(3)
-            .add(&rand_x.square().mul(&a2))
-            .add(&rand_x.mul(&a4))
-            .add(&a6)
+            .add(&rand_x.square().mul(a2))
+            .add(&rand_x.mul(a4))
+            .add(a6)
             .neg();
 
         let delta = &b.square().add(&c.zmul(4).neg());
@@ -244,29 +244,29 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
 
         let (a1, a2, a3, a4, _, _) = self.get_a_invariants();
 
-        let coeff = match y_p.zmul(2).add(&x_p.mul(&a1)).add(&a3).invert() {
+        let coeff = match y_p.zmul(2).add(&x_p.mul(a1)).add(a3).invert() {
             Ok(x) => *x,
             Err(_) => todo!(),
         };
 
         let lambda = &a1
             .zmul(3)
-            .add(&x_p.mul(&a2).zmul(2))
-            .add(&y_p.mul(&a1).neg())
-            .add(&a4)
+            .add(&x_p.mul(a2).zmul(2))
+            .add(&y_p.mul(a1).neg())
+            .add(a4)
             .mul(&coeff);
 
         let res_x = lambda
             .square()
-            .add(&a1.mul(&lambda))
+            .add(&a1.mul(lambda))
             .add(&a2.neg())
             .add(&x_p.zmul(2).neg());
 
         let res_y = res_x
-            .mul(&a1)
+            .mul(a1)
             .neg()
             .add(&a3.neg())
-            .add(&res_x.mul(&lambda))
+            .add(&res_x.mul(lambda))
             .add(&x_p.mul(lambda))
             .add(&y_p.neg());
 
