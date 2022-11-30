@@ -43,14 +43,15 @@ pub fn miller<F: Field + Clone + PartialEq>(
     n: &Integer,
 ) -> Result<F, ErrorKind> {
     // Basic checks
-    if pt_p == &ECPoint::PointAtInfinity {
-        return Err(ErrorKind::InvalidInput("P must not be zero"));
-    }
-    if pt_q == &ECPoint::PointAtInfinity {
-        return Err(ErrorKind::InvalidInput("Q must not be zero"));
-    }
+
+    let one = match (pt_p, pt_q) {
+        (ECPoint::PointAtInfinity, _) => return Err(ErrorKind::InvalidInput("P must not be zero")),
+        (_, ECPoint::PointAtInfinity) => return Err(ErrorKind::InvalidInput("Q must not be zero")),
+        (ECPoint::AffinePoint(x, _), ECPoint::AffinePoint(_, _)) => x.one(),
+    };
+
     if n.is_zero() {
-        return Ok(F::one());
+        return Ok(one);
     }
 
     // Negative values of n are allowed, in which case
@@ -58,8 +59,6 @@ pub fn miller<F: Field + Clone + PartialEq>(
     let sign = n.is_positive();
     //let n = n.abs();
     let nbits = n.abs_ref().complete().to_bits();
-
-    let one = F::one();
 
     let mut t = one;
     let mut i: usize = nbits.len() - 1; // Will not underflow because n != 0
@@ -73,14 +72,26 @@ pub fn miller<F: Field + Clone + PartialEq>(
             let pt_s = curve.double(&pt_v);
             let ell = curve.line(&pt_v, &pt_v, pt_q)?;
             let vee = curve.line(&pt_s, &curve.invert(&pt_s)?, pt_q)?;
-            t = t.square().mul(&ell.div(&vee));
+
+            let ratio = match ell.div(&vee) {
+                Ok(x) => *x,
+                Err(_) => todo!(),
+            };
+
+            t = t.square().mul(&ratio);
             pt_v = pt_s;
 
             if nbits[i] {
                 let pt_s = curve.add(&pt_v, pt_p);
                 let ell = curve.line(&pt_v, pt_p, pt_q)?;
                 let vee = curve.line(&pt_s, &curve.invert(&pt_s)?, pt_q)?;
-                t = t.mul(&ell.div(&vee));
+
+                let ratio = match ell.div(&vee) {
+                    Ok(x) => *x,
+                    Err(_) => todo!(),
+                };
+
+                t = t.mul(&ratio);
                 pt_v = pt_s;
             }
 
@@ -94,7 +105,10 @@ pub fn miller<F: Field + Clone + PartialEq>(
     // Inversion for the Ate pairing
     if !sign {
         let vee = curve.line(&pt_v, &curve.invert(&pt_v)?, pt_q)?;
-        t = t.mul(&vee).invert();
+        t = match t.mul(&vee).invert() {
+            Ok(x) => *x,
+            Err(_) => todo!(),
+        }
     }
 
     Ok(t)
@@ -109,7 +123,7 @@ pub fn weil_pairing<F: Field + Clone + PartialEq>(
     pt_q: ECPoint<F>,
     order: Integer,
 ) -> Result<F, ErrorKind> {
-    let one = F::one();
+    let one = F::random_element().one();
 
     // P = Q, P = 0, or Q = 0
     if pt_p == pt_q || pt_p == ECPoint::PointAtInfinity || pt_q == ECPoint::PointAtInfinity {
@@ -119,7 +133,10 @@ pub fn weil_pairing<F: Field + Clone + PartialEq>(
     // Weil pairing
     let f_pq = miller(curve, &pt_p, &pt_q, &order)?;
     let f_qp = miller(curve, &pt_q, &pt_p, &order)?;
-    let ratio = f_pq.div(&f_qp);
+    let ratio = match f_pq.div(&f_qp) {
+        Ok(x) => *x,
+        Err(_) => todo!(),
+    };
 
     // Sign correction if needed
     if order.is_odd() {
@@ -163,7 +180,12 @@ pub fn tate_pairing<F: Field + Clone + PartialEq>(
         )?;
         let f_r = tate_pairing(curve, pt_p, &pt_r, order, embedding_degree)?;
 
-        Ok(f_qr.div(&f_r))
+        let ratio = match f_qr.div(&f_r) {
+            Ok(x) => *x,
+            Err(_) => todo!(),
+        };
+
+        Ok(ratio)
     }
 }
 

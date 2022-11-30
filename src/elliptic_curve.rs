@@ -32,15 +32,11 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
             ECPoint::AffinePoint(x_p, y_p) => {
                 let (a1, a2, a3, a4, _, a6) = self.get_a_invariants();
                 // y² + a1 xy + a3 y = x³ + a2 x² + a4 x + a6
-                y_p.clone()
-                    .square()
-                    .add(&y_p.clone().mul(&x_p.clone().mul(a1)))
-                    .add(&y_p.clone().mul(a3))
+                y_p.square().add(&y_p.mul(&x_p.mul(a1))).add(&y_p.mul(a3))
                     == x_p
-                        .clone()
                         .zpow(3)
-                        .add(&x_p.clone().square().mul(a2))
-                        .add(&x_p.clone().mul(a4))
+                        .add(&x_p.square().mul(a2))
+                        .add(&x_p.mul(a4))
                         .add(a6)
             }
         }
@@ -50,25 +46,33 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
     pub fn random_point(self) -> ECPoint<F> {
         let (a1, a2, a3, a4, _, a6) = self.get_a_invariants();
         // Get a random x
-        let rand_x = F::random_element();
+        let rand_x = self.weierstrass_coefficients.0.random_element();
 
         // y² + ( a1 x + a3 ) * y = x³ + a2 x² + a4 x + a6
         // b = a1 x + a3
-        let b = &rand_x.clone().mul(a1).add(a3);
+        let b = &rand_x.mul(a1).add(a3);
 
         // c = - ( x³ + a2 x² + a4 x + a6 )
         let c = &rand_x
-            .clone()
             .zpow(3)
-            .add(&rand_x.clone().square().mul(a2))
-            .add(&rand_x.clone().mul(a4))
+            .add(&rand_x.square().mul(a2))
+            .add(&rand_x.mul(a4))
             .add(a6)
             .neg();
-        let half = F::one().zmul(2).invert();
-        let delta = &b.clone().square().add(&c.clone().zmul(4).neg());
+
+        let delta = &b.square().add(&c.zmul(4).neg());
+
+        let half = match c.one().zmul(2).invert() {
+            Ok(x) => *x,
+            Err(_) => todo!(),
+        };
 
         // y = ( - b + sqrt( delta ) ) / 2
-        let rand_y = half.mul(&b.clone().neg().add(&delta.clone().sqrt()));
+        let sq = match delta.sqrt() {
+            Ok(x) => *x,
+            Err(_) => todo!(),
+        };
+        let rand_y = half.mul(&b.neg().add(&sq));
 
         ECPoint::AffinePoint(rand_x, rand_y)
     }
@@ -98,39 +102,44 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
             ECPoint::AffinePoint(x, y) => (x, y),
         };
 
+        let zero = x_r.zero();
+
         match (pt_p, pt_q) {
             // Case P = Q = 0
-            (ECPoint::PointAtInfinity, ECPoint::PointAtInfinity) => Ok(F::one()),
+            (ECPoint::PointAtInfinity, ECPoint::PointAtInfinity) => Ok(zero),
             (ECPoint::PointAtInfinity, ECPoint::AffinePoint(x_q, _)) => {
                 // Case P = 0
                 // xR - xQ
-                let x_q_neg = x_q.clone().neg();
-                Ok(x_r.clone().add(&x_q_neg))
+                let x_q_neg = x_q.neg();
+                Ok(x_r.add(&x_q_neg))
             }
             (ECPoint::AffinePoint(x_p, _), ECPoint::PointAtInfinity) => {
                 // Case Q = 0
                 // xR - xP
-                let x_p_neg = x_p.clone().neg();
-                Ok(x_r.clone().add(&x_p_neg))
+                let x_p_neg = x_p.neg();
+                Ok(x_r.add(&x_p_neg))
             }
             (ECPoint::AffinePoint(x_p, y_p), ECPoint::AffinePoint(x_q, y_q)) => {
-                let x_p_neg = x_p.clone().neg();
-                let y_p_neg = y_p.clone().neg();
+                let x_p_neg = x_p.neg();
+                let y_p_neg = y_p.neg();
 
                 if (x_p != x_q) || (y_p != y_q) {
                     // Case P != Q
                     if x_p == x_q {
                         // Case xP = xQ
                         // xR - xP
-                        Ok(x_r.clone().add(&x_p_neg))
+                        Ok(x_r.add(&x_p_neg))
                     } else {
                         // Case xP != xQ
-                        let num = x_p_neg.clone().add(y_q);
-                        let denom = x_p_neg.clone().add(x_q);
-                        let slope = num.div(&denom);
+                        let num = x_p_neg.add(y_q);
+                        let denom = x_p_neg.add(x_q);
+                        let slope = match num.div(&denom) {
+                            Ok(x) => *x,
+                            Err(_) => todo!(),
+                        };
 
-                        let xdiff = (x_r.clone().add(&x_p_neg)).mul(&slope).neg();
-                        let ydiff = y_r.clone().add(&y_p_neg);
+                        let xdiff = (x_r.add(&x_p_neg)).mul(&slope).neg();
+                        let ydiff = y_r.add(&y_p_neg);
                         Ok(xdiff.add(&ydiff))
                     }
                 } else {
@@ -139,24 +148,26 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
 
                     // 3x² + 2x a2 - y a1 + a4
                     let num = x_p
-                        .clone()
                         .square()
                         .zmul(3)
-                        .add(&y_p.clone().mul(a1).neg())
+                        .add(&y_p.mul(a1).neg())
                         .add(a4)
-                        .add(&x_p.clone().mul(a2).zmul(2));
+                        .add(&x_p.mul(a2).zmul(2));
 
                     // 2y + x a1 + a3
-                    let denom = y_p.clone().zmul(2).add(a3).add(&x_p.clone().mul(a1));
+                    let denom = y_p.zmul(2).add(a3).add(&x_p.mul(a1));
 
-                    if denom == F::zero() {
+                    if denom == denom.zero() {
                         // xR - xP
-                        Ok(x_r.clone().add(&x_p_neg))
+                        Ok(x_r.add(&x_p_neg))
                     } else {
-                        let slope = num.div(&denom);
+                        let slope = match num.div(&denom) {
+                            Ok(x) => *x,
+                            Err(_) => todo!(),
+                        };
 
-                        let xdiff = (x_r.clone().add(&x_p_neg)).mul(&slope).neg();
-                        let ydiff = y_r.clone().add(&y_p_neg);
+                        let xdiff = (x_r.add(&x_p_neg)).mul(&slope).neg();
+                        let ydiff = y_r.add(&y_p_neg);
 
                         Ok(ydiff.add(&xdiff))
                     }
@@ -178,53 +189,47 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
 
         let (a1, a2, a3, a4, _, a6) = self.get_a_invariants();
 
-        if x_p == x_q && y_p.clone().add(y_q).add(&a1.clone().mul(x_q)).add(a3) == F::zero() {
+        if x_p == x_q && (y_p.add(y_q).add(&a1.mul(x_q)).add(a3)).is_zero() {
             EllipticCurve::infinity_point()
         } else {
-            let lambda;
-            let nu;
+            let denom;
+            let lambda_num;
+            let nu_num;
+
             if x_p == x_q {
-                lambda = (a4
-                    .clone()
-                    .add(&x_p.clone().square().zmul(3))
-                    .add(&a2.clone().mul(x_p).zmul(2))
-                    .add(&a1.clone().mul(y_p).neg()))
-                .div(
-                    &a3.clone()
-                        .add(&y_p.clone().zmul(2))
-                        .add(&a1.clone().mul(x_p)),
-                );
-                nu = (x_p.clone().square().mul(x_p).neg())
-                    .add(&a4.clone().mul(x_p))
-                    .add(&a6.clone().zmul(2))
-                    .add(&a3.clone().mul(y_p).neg())
-                    .div(
-                        &a3.clone()
-                            .add(&y_p.clone().zmul(2))
-                            .add(&a1.clone().mul(x_p)),
-                    );
+                denom = a3.add(&y_p.zmul(2)).add(&a1.mul(x_p));
+
+                lambda_num = a4
+                    .add(&x_p.square().zmul(3))
+                    .add(&a2.mul(x_p).zmul(2))
+                    .add(&a1.mul(y_p).neg());
+
+                nu_num = (x_p.square().mul(x_p).neg())
+                    .add(&a4.mul(x_p))
+                    .add(&a6.zmul(2))
+                    .add(&a3.mul(y_p).neg())
             } else {
-                lambda = y_q
-                    .clone()
-                    .add(&y_p.clone().neg())
-                    .div(&x_q.clone().add(&x_p.clone().neg()));
-                nu = y_p
-                    .clone()
-                    .mul(x_q)
-                    .add(&y_q.clone().mul(x_p).neg())
-                    .div(&x_q.clone().add(&x_p.clone().neg()));
+                denom = x_q.add(&x_p.neg());
+                lambda_num = y_q.add(&y_p.neg());
+                nu_num = y_p.mul(x_q).add(&y_q.mul(x_p).neg());
             }
+
+            let lambda = match lambda_num.div(&denom) {
+                Ok(x) => *x,
+                Err(_) => todo!(),
+            };
+
+            let nu = match nu_num.div(&denom) {
+                Ok(x) => *x,
+                Err(_) => todo!(),
+            };
+
             let x = a2
-                .clone()
                 .neg()
-                .add(&x_p.clone().add(x_q).neg())
-                .add(&lambda.clone().square())
-                .add(&a1.clone().mul(&lambda));
-            let y = a3
-                .clone()
-                .add(&nu)
-                .add(&x.clone().mul(&lambda.add(a1)))
-                .neg();
+                .add(&x_p.add(x_q).neg())
+                .add(&lambda.square())
+                .add(&a1.mul(&lambda));
+            let y = a3.add(&nu).add(&x.mul(&lambda.add(a1))).neg();
 
             ECPoint::AffinePoint(x, y)
         }
@@ -239,34 +244,31 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
 
         let (a1, a2, a3, a4, _, _) = self.get_a_invariants();
 
+        let coeff = match y_p.zmul(2).add(&x_p.mul(a1)).add(a3).invert() {
+            Ok(x) => *x,
+            Err(_) => todo!(),
+        };
+
         let lambda = &a1
-            .clone()
             .zmul(3)
-            .add(&x_p.clone().mul(a2).zmul(2))
-            .add(&y_p.clone().mul(a1).neg())
+            .add(&x_p.mul(a2).zmul(2))
+            .add(&y_p.mul(a1).neg())
             .add(a4)
-            .mul(
-                &y_p.clone()
-                    .zmul(2)
-                    .add(&x_p.clone().mul(a1))
-                    .add(a3)
-                    .invert(),
-            );
+            .mul(&coeff);
+
         let res_x = lambda
-            .clone()
             .square()
-            .add(&a1.clone().mul(&lambda.clone()))
-            .add(&a2.clone().neg())
-            .add(&x_p.clone().zmul(2).neg());
+            .add(&a1.mul(lambda))
+            .add(&a2.neg())
+            .add(&x_p.zmul(2).neg());
 
         let res_y = res_x
-            .clone()
             .mul(a1)
             .neg()
-            .add(&a3.clone().neg())
-            .add(&res_x.clone().mul(&lambda.clone()))
-            .add(&x_p.clone().mul(lambda))
-            .add(&y_p.clone().neg());
+            .add(&a3.neg())
+            .add(&res_x.mul(lambda))
+            .add(&x_p.mul(lambda))
+            .add(&y_p.neg());
 
         ECPoint::AffinePoint(res_x, res_y)
     }
@@ -279,7 +281,7 @@ impl<F: Field + Clone + PartialEq> EllipticCurve<F> {
             ECPoint::AffinePoint(x, y) => (x, y),
         };
         let (a1, _, a3, _, _, _) = self.get_a_invariants();
-        let new_y = a3.clone().add(&a1.clone().mul(x)).add(y).neg();
+        let new_y = a3.add(&a1.mul(x)).add(y).neg();
 
         Ok(ECPoint::AffinePoint(x.clone(), new_y))
     }

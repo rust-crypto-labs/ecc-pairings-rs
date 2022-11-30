@@ -1,5 +1,5 @@
 [package]
-authors = ["r.g.s. <anx99@rgs.com>"]
+authors = ["r.g.s. <anx99@rgs.com>", "Romain Ninot <romain.ninot@outlook.fr>"]
 edition = "2021"
 name = "pairings"
 version = "0.1.0"
